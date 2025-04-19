@@ -1,15 +1,15 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircleIcon, SearchIcon, PlusIcon } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { SearchIcon, PlusIcon } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { BloodStockCard } from '@/components/inventory/BloodStockCard';
+import { InventoryStats } from '@/components/inventory/InventoryStats';
+import { BloodComponentForm } from '@/components/inventory/BloodComponentForm';
 
 // Mock inventory data
 const mockInventory = [
@@ -173,159 +173,34 @@ const InventoryManagement = () => {
     return matchesSearch && matchesBloodType;
   });
 
-  // Calculate inventory stats
-  const totalUnits = inventory.reduce((sum, item) => sum + item.units, 0);
-  const criticalTypes = inventory.filter(item => item.units < 10).map(item => item.bloodType);
-  
-  // Handle adding new inventory
-  const handleAddInventory = () => {
-    // Validate form
-    if (!newInventory.bloodType || !newInventory.units || !newInventory.location) {
-      toast({
-        variant: "destructive",
-        title: "Missing information",
-        description: "Please fill in all required fields.",
-      });
-      return;
-    }
-    
-    // Calculate expiry date (typically 42 days from donation)
-    const donationDate = new Date(newInventory.donationDate);
-    const expiryDate = new Date(donationDate);
-    expiryDate.setDate(donationDate.getDate() + 42);
-    
-    // Add new inventory
-    const newItem = {
-      id: (inventory.length + 1).toString(),
-      bloodType: newInventory.bloodType,
-      units: parseInt(newInventory.units, 10),
-      location: newInventory.location,
-      expiryDate: expiryDate.toISOString().split('T')[0],
-      status: 'available',
-      donationDate: newInventory.donationDate,
+  const calculateStats = () => {
+    const totalUnits = inventory.reduce((sum, item) => sum + item.units, 0);
+    const criticalTypes = inventory.filter(item => item.units < 10).map(item => item.bloodType);
+    const expiringUnits = inventory.filter(item => {
+      const expiryDate = new Date(item.expiryDate);
+      const today = new Date();
+      const daysUntilExpiry = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      return daysUntilExpiry <= 7;
+    }).length;
+
+    const bloodTypeDistribution = Array.from(
+      new Set(inventory.map(item => item.bloodType))
+    ).map(type => ({
+      name: type,
+      value: inventory
+        .filter(item => item.bloodType === type)
+        .reduce((sum, item) => sum + item.units, 0)
+    }));
+
+    return {
+      totalUnits,
+      criticalTypes,
+      expiringUnits,
+      bloodTypeDistribution
     };
-    
-    setInventory([...inventory, newItem]);
-    
-    // Add corresponding transaction
-    const newTransactionItem = {
-      id: (transactions.length + 1).toString(),
-      date: new Date().toISOString().split('T')[0],
-      type: 'incoming',
-      bloodType: newInventory.bloodType,
-      units: parseInt(newInventory.units, 10),
-      source: newInventory.source || 'Unknown Source',
-      destination: newInventory.location,
-    };
-    
-    setTransactions([...transactions, newTransactionItem]);
-    setIsAddDialogOpen(false);
-    
-    // Reset form
-    setNewInventory({
-      bloodType: '',
-      units: '',
-      location: '',
-      donationDate: new Date().toISOString().split('T')[0],
-      source: '',
-    });
-    
-    toast({
-      title: "Inventory added successfully",
-      description: `${newInventory.units} units of ${newInventory.bloodType} blood added to inventory.`,
-    });
   };
 
-  // Handle adding a new transaction
-  const handleAddTransaction = () => {
-    // Validate form
-    if (!newTransaction.bloodType || !newTransaction.units || 
-        !newTransaction.source || !newTransaction.destination) {
-      toast({
-        variant: "destructive",
-        title: "Missing information",
-        description: "Please fill in all required fields.",
-      });
-      return;
-    }
-    
-    const units = parseInt(newTransaction.units, 10);
-    
-    // Update inventory based on transaction type
-    if (newTransaction.type === 'outgoing') {
-      // Check if enough units are available
-      const bloodTypeInventory = inventory.filter(item => 
-        item.bloodType === newTransaction.bloodType && item.status === 'available'
-      );
-      
-      const availableUnits = bloodTypeInventory.reduce((sum, item) => sum + item.units, 0);
-      
-      if (availableUnits < units) {
-        toast({
-          variant: "destructive",
-          title: "Insufficient inventory",
-          description: `Only ${availableUnits} units of ${newTransaction.bloodType} available.`,
-        });
-        return;
-      }
-      
-      // Update inventory
-      let remainingUnits = units;
-      const updatedInventory = inventory.map(item => {
-        if (item.bloodType === newTransaction.bloodType && 
-            item.status === 'available' && 
-            remainingUnits > 0) {
-          
-          if (item.units <= remainingUnits) {
-            // Use all units from this item
-            remainingUnits -= item.units;
-            return {
-              ...item,
-              units: 0,
-              status: 'depleted',
-            };
-          } else {
-            // Use partial units from this item
-            return {
-              ...item,
-              units: item.units - remainingUnits,
-            };
-          }
-        }
-        return item;
-      }).filter(item => item.units > 0); // Remove depleted items
-      
-      setInventory(updatedInventory);
-    }
-    
-    // Add transaction record
-    const newTransactionItem = {
-      id: (transactions.length + 1).toString(),
-      date: new Date().toISOString().split('T')[0],
-      type: newTransaction.type,
-      bloodType: newTransaction.bloodType,
-      units: units,
-      source: newTransaction.source,
-      destination: newTransaction.destination,
-    };
-    
-    setTransactions([...transactions, newTransactionItem]);
-    setIsTransactionDialogOpen(false);
-    
-    // Reset form
-    setNewTransaction({
-      type: 'incoming',
-      bloodType: '',
-      units: '',
-      source: '',
-      destination: '',
-    });
-    
-    toast({
-      title: "Transaction recorded successfully",
-      description: `${newTransaction.type === 'incoming' ? 'Received' : 'Dispatched'} ${units} units of ${newTransaction.bloodType} blood.`,
-    });
-  };
+  const stats = calculateStats();
 
   return (
     <div className="space-y-6">
@@ -354,42 +229,7 @@ const InventoryManagement = () => {
         </div>
       </div>
 
-      {/* Inventory Stats Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col">
-              <p className="text-sm font-medium text-muted-foreground">Total Blood Units</p>
-              <p className="text-3xl font-bold">{totalUnits}</p>
-              <p className="text-sm text-muted-foreground mt-2">Across all blood types</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col">
-              <p className="text-sm font-medium text-muted-foreground">Critical Stock</p>
-              <p className="text-3xl font-bold">{criticalTypes.length}</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                {criticalTypes.length > 0 
-                  ? `Low: ${criticalTypes.join(', ')}` 
-                  : 'All blood types at healthy levels'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col">
-              <p className="text-sm font-medium text-muted-foreground">Recent Transactions</p>
-              <p className="text-3xl font-bold">{transactions.slice(0, 5).length}</p>
-              <p className="text-sm text-muted-foreground mt-2">In the last 7 days</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <InventoryStats {...stats} />
 
       <Tabs defaultValue="current">
         <TabsList>
@@ -441,83 +281,18 @@ const InventoryManagement = () => {
             </CardHeader>
             
             <CardContent>
-              <div className="border rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Blood Type</TableHead>
-                      <TableHead>Units</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Donation Date</TableHead>
-                      <TableHead>Expiry Date</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredInventory.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                          No inventory items found matching your search criteria
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredInventory.map((item) => {
-                        const expiryDate = new Date(item.expiryDate);
-                        const today = new Date();
-                        const daysUntilExpiry = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                        const isNearExpiry = daysUntilExpiry <= 7;
-                        
-                        return (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50">
-                                {item.bloodType}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              {item.units < 10 ? (
-                                <div className="flex items-center">
-                                  <span>{item.units}</span>
-                                  {item.units < 5 && (
-                                    <AlertCircleIcon size={16} className="ml-2 text-red-500" />
-                                  )}
-                                </div>
-                              ) : (
-                                item.units
-                              )}
-                            </TableCell>
-                            <TableCell>{item.location}</TableCell>
-                            <TableCell>{item.donationDate}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center">
-                                <span>{item.expiryDate}</span>
-                                {isNearExpiry && (
-                                  <span className="ml-2 text-xs text-red-500">
-                                    ({daysUntilExpiry} days)
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge 
-                                variant={item.status === 'available' ? 'default' : 'secondary'}
-                                className={
-                                  item.status === 'available' 
-                                    ? 'bg-green-100 text-green-800 hover:bg-green-100' 
-                                    : item.status === 'reserved'
-                                      ? 'bg-blue-100 text-blue-800 hover:bg-blue-100'
-                                      : 'bg-gray-100 text-gray-800 hover:bg-gray-100'
-                                }
-                              >
-                                {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredInventory.map((item) => (
+                  <BloodStockCard
+                    key={item.id}
+                    bloodType={item.bloodType}
+                    units={item.units}
+                    location={item.location}
+                    expiryDate={item.expiryDate}
+                    status={item.status}
+                    component={item.component || "Whole Blood"}
+                  />
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -585,103 +360,12 @@ const InventoryManagement = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Add Inventory Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Add New Inventory</DialogTitle>
-            <DialogDescription>
-              Add new blood units to the inventory system.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="bloodType" className="text-sm font-medium">Blood Type</label>
-                <Select
-                  value={newInventory.bloodType}
-                  onValueChange={(value) => setNewInventory({ ...newInventory, bloodType: value })}
-                >
-                  <SelectTrigger id="bloodType">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="A+">A+</SelectItem>
-                    <SelectItem value="A-">A-</SelectItem>
-                    <SelectItem value="B+">B+</SelectItem>
-                    <SelectItem value="B-">B-</SelectItem>
-                    <SelectItem value="AB+">AB+</SelectItem>
-                    <SelectItem value="AB-">AB-</SelectItem>
-                    <SelectItem value="O+">O+</SelectItem>
-                    <SelectItem value="O-">O-</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="units" className="text-sm font-medium">Units</label>
-                <Input
-                  id="units"
-                  type="number"
-                  value={newInventory.units}
-                  onChange={(e) => setNewInventory({ ...newInventory, units: e.target.value })}
-                  placeholder="Number of units"
-                  min="1"
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="location" className="text-sm font-medium">Storage Location</label>
-              <Select
-                value={newInventory.location}
-                onValueChange={(value) => setNewInventory({ ...newInventory, location: value })}
-              >
-                <SelectTrigger id="location">
-                  <SelectValue placeholder="Select location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Main Storage">Main Storage</SelectItem>
-                  <SelectItem value="Cold Storage 1">Cold Storage 1</SelectItem>
-                  <SelectItem value="Cold Storage 2">Cold Storage 2</SelectItem>
-                  <SelectItem value="Mobile Unit">Mobile Unit</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="donationDate" className="text-sm font-medium">Donation Date</label>
-              <Input
-                id="donationDate"
-                type="date"
-                value={newInventory.donationDate}
-                onChange={(e) => setNewInventory({ ...newInventory, donationDate: e.target.value })}
-                max={new Date().toISOString().split('T')[0]}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="source" className="text-sm font-medium">Source</label>
-              <Input
-                id="source"
-                value={newInventory.source}
-                onChange={(e) => setNewInventory({ ...newInventory, source: e.target.value })}
-                placeholder="Donation drive, hospital, etc."
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-            <Button className="bg-bloodRed hover:bg-bloodRed/90" onClick={handleAddInventory}>
-              Add to Inventory
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <BloodComponentForm 
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSubmit={handleAddInventory}
+      />
 
-      {/* Add Transaction Dialog */}
       <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
