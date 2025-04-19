@@ -1,6 +1,6 @@
 
 import { Card, CardContent } from "@/components/ui/card"
-import { Chart } from "@/components/ui/chart"
+import { Chart } from "@/components/ui/chart-wrapper"
 import { AlertCircle } from "lucide-react"
 
 interface InventoryStatsProps {

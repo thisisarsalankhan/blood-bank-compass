@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { SearchIcon, PlusIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BloodStockCard } from '@/components/inventory/BloodStockCard';
@@ -21,6 +23,7 @@ const mockInventory = [
     expiryDate: '2024-05-15',
     status: 'available',
     donationDate: '2024-04-01',
+    component: 'Whole Blood'
   },
   {
     id: '2',
@@ -30,6 +33,7 @@ const mockInventory = [
     expiryDate: '2024-05-10',
     status: 'available',
     donationDate: '2024-03-28',
+    component: 'Whole Blood'
   },
   {
     id: '3',
@@ -39,6 +43,7 @@ const mockInventory = [
     expiryDate: '2024-05-18',
     status: 'available',
     donationDate: '2024-04-03',
+    component: 'Plasma'
   },
   {
     id: '4',
@@ -48,6 +53,7 @@ const mockInventory = [
     expiryDate: '2024-05-20',
     status: 'available',
     donationDate: '2024-04-05',
+    component: 'Whole Blood'
   },
   {
     id: '5',
@@ -57,6 +63,7 @@ const mockInventory = [
     expiryDate: '2024-05-12',
     status: 'reserved',
     donationDate: '2024-03-30',
+    component: 'Platelets'
   },
   {
     id: '6',
@@ -66,6 +73,7 @@ const mockInventory = [
     expiryDate: '2024-05-16',
     status: 'available',
     donationDate: '2024-04-02',
+    component: 'Red Blood Cells'
   },
   {
     id: '7',
@@ -75,6 +83,7 @@ const mockInventory = [
     expiryDate: '2024-05-08',
     status: 'available',
     donationDate: '2024-03-25',
+    component: 'Plasma'
   },
   {
     id: '8',
@@ -84,6 +93,7 @@ const mockInventory = [
     expiryDate: '2024-05-22',
     status: 'available',
     donationDate: '2024-04-07',
+    component: 'Whole Blood'
   },
 ];
 
@@ -172,6 +182,73 @@ const InventoryManagement = () => {
     
     return matchesSearch && matchesBloodType;
   });
+
+  // Handle adding new inventory
+  const handleAddInventory = (data: any) => {
+    const newItem = {
+      id: `${inventory.length + 1}`,
+      bloodType: data.bloodType,
+      units: parseInt(data.units),
+      location: data.location,
+      expiryDate: data.expiryDate,
+      status: 'available',
+      donationDate: data.donationDate,
+      component: data.component || 'Whole Blood'
+    };
+    
+    setInventory([...inventory, newItem]);
+    setIsAddDialogOpen(false);
+    
+    toast({
+      title: "Inventory Added",
+      description: `${data.units} units of ${data.bloodType} ${data.component} added to inventory.`,
+    });
+  };
+
+  // Handle adding new transaction
+  const handleAddTransaction = () => {
+    if (!newTransaction.bloodType || !newTransaction.units || !newTransaction.source || !newTransaction.destination) {
+      toast({
+        title: "Invalid Input",
+        description: "Please fill in all fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const newItem = {
+      id: `${transactions.length + 1}`,
+      date: new Date().toISOString().split('T')[0],
+      type: newTransaction.type,
+      bloodType: newTransaction.bloodType,
+      units: parseInt(newTransaction.units),
+      source: newTransaction.source,
+      destination: newTransaction.destination
+    };
+    
+    setTransactions([newItem, ...transactions]);
+    
+    // Update inventory if it's an outgoing transaction
+    if (newTransaction.type === 'outgoing') {
+      const updatedInventory = inventory.map(item => {
+        if (item.bloodType === newTransaction.bloodType) {
+          return {
+            ...item,
+            units: Math.max(0, item.units - parseInt(newTransaction.units))
+          };
+        }
+        return item;
+      });
+      setInventory(updatedInventory);
+    }
+    
+    setIsTransactionDialogOpen(false);
+    
+    toast({
+      title: newTransaction.type === 'incoming' ? "Blood Received" : "Blood Dispatched",
+      description: `${newTransaction.units} units of ${newTransaction.bloodType} ${newTransaction.type === 'incoming' ? 'received from' : 'dispatched to'} ${newTransaction.type === 'incoming' ? newTransaction.source : newTransaction.destination}.`,
+    });
+  };
 
   const calculateStats = () => {
     const totalUnits = inventory.reduce((sum, item) => sum + item.units, 0);
