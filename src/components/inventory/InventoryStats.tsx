@@ -1,7 +1,7 @@
 
 import { Card, CardContent } from "@/components/ui/card"
-import { ChartContainer } from "@/components/ui/chart"
-import { AlertCircle, TrendingUp, TrendingDown } from "lucide-react"
+import { Chart } from "@/components/ui/chart-wrapper"
+import { AlertCircle, TrendingUp, TrendingDown, ChartBar } from "lucide-react"
 
 interface InventoryStatsProps {
   totalUnits: number
@@ -21,7 +21,7 @@ export const InventoryStats = ({
 }: InventoryStatsProps) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      <Card className="hover:shadow-lg transition-shadow duration-200">
+      <Card className="hover:shadow-lg transition-shadow duration-200 border-l-4 border-l-primary">
         <CardContent className="p-6">
           <div className="flex flex-col">
             <div className="flex items-center justify-between mb-4">
@@ -39,7 +39,7 @@ export const InventoryStats = ({
         </CardContent>
       </Card>
 
-      <Card className="hover:shadow-lg transition-shadow duration-200">
+      <Card className="hover:shadow-lg transition-shadow duration-200 border-l-4 border-l-red-500">
         <CardContent className="p-6">
           <div className="flex flex-col">
             <div className="flex items-center justify-between mb-4">
@@ -63,7 +63,7 @@ export const InventoryStats = ({
         </CardContent>
       </Card>
 
-      <Card className="hover:shadow-lg transition-shadow duration-200">
+      <Card className="hover:shadow-lg transition-shadow duration-200 border-l-4 border-l-yellow-500">
         <CardContent className="p-6">
           <div className="flex flex-col">
             <div className="flex items-center justify-between mb-4">
@@ -83,16 +83,20 @@ export const InventoryStats = ({
 
       <Card className="md:col-span-3 hover:shadow-lg transition-shadow duration-200">
         <CardContent className="p-6">
-          <h3 className="text-lg font-semibold mb-6">Blood Type Distribution</h3>
+          <div className="flex items-center mb-6">
+            <div className="p-2 bg-primary/10 rounded-full mr-3">
+              <ChartBar className="h-5 w-5 text-primary" />
+            </div>
+            <h3 className="text-lg font-semibold">Blood Type Distribution</h3>
+          </div>
           <div className="h-[300px] w-full">
-            <ChartContainer
+            <Chart
               type="bar"
               data={bloodTypeDistribution}
               categories={['value']}
               index="name"
               colors={['#ef4444', '#f97316', '#eab308', '#84cc16', '#06b6d4', '#6366f1']}
               valueFormatter={(value) => `${value} units`}
-              className="[&_.recharts-cartesian-grid-horizontal_line]:stroke-muted/20 [&_.recharts-cartesian-grid-vertical_line]:stroke-muted/20"
             />
           </div>
         </CardContent>
