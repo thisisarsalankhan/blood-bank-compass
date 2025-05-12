@@ -12,28 +12,31 @@ import HospitalRequests from "./pages/HospitalRequests";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 import { AuthProvider } from "./context/AuthContext";
+import { SupabaseAuthProvider } from "./context/SupabaseAuthContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="/donors" element={<DonorManagement />} />
-              <Route path="/inventory" element={<InventoryManagement />} />
-              <Route path="/requests" element={<HospitalRequests />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+      <SupabaseAuthProvider>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/" element={<Layout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="/donors" element={<DonorManagement />} />
+                <Route path="/inventory" element={<InventoryManagement />} />
+                <Route path="/requests" element={<HospitalRequests />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </SupabaseAuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
